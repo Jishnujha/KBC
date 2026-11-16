@@ -30,22 +30,13 @@ function broadcast(poll) {
 }
 
 function closePoll(poll) {
-     if (!poll || !poll.open) return ack({ ok: false });
-    if (poll.votes.has(socket.id)) return ack({ ok: false, message: 'You have already voted.' });
-    if (!Number.isInteger(option) || option < 0 || option > 3) return ack({ ok: false });
-    
-    poll.votes.set(socket.id, option);
-    poll.counts[option] += 1;
-    broadcast(poll);
-    ack({ ok: true });
-  }); // This closes the audience:vote event
-}); // This closes the io.on('connection') event
+  if (!poll || !poll.open) return;
+  poll.open = false;
+  clearInterval(poll.ticker);
+  io.to(poll.room).emit('poll:closed', publicPoll(poll));
+  setTimeout(() => polls.delete(poll.room), 10 * 60 * 1000);
+}
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
 io.on('connection', (socket) => {
   socket.on('host:start-poll', (data, ack = () => {}) => {
     const room = String(data && data.room || '');
@@ -81,4 +72,21 @@ io.on('connection', (socket) => {
   socket.on('audience:vote', (data, ack = () => {}) => {
     const poll = polls.get(String(data && data.room || ''));
     const option = Number(data && data.option);
-    if (!poll
+    
+    // Completed the if statement and added the vote logic
+    if (!poll || !poll.open) return ack({ ok: false });
+    if (poll.votes.has(socket.id)) return ack({ ok: false, message: 'You have already voted.' });
+    if (!Number.isInteger(option) || option < 0 || option > 3) return ack({ ok: false });
+    
+    poll.votes.set(socket.id, option);
+    poll.counts[option] += 1;
+    broadcast(poll);
+    ack({ ok: true });
+  }); // Closes the audience:vote listener
+}); // Closes the io.on('connection') block
+
+// Start the server on the port Render provides (or 3000 locally)
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
