@@ -30,13 +30,22 @@ function broadcast(poll) {
 }
 
 function closePoll(poll) {
-  if (!poll || !poll.open) return;
-  poll.open = false;
-  clearInterval(poll.ticker);
-  io.to(poll.room).emit('poll:closed', publicPoll(poll));
-  setTimeout(() => polls.delete(poll.room), 10 * 60 * 1000);
-}
+     if (!poll || !poll.open) return ack({ ok: false });
+    if (poll.votes.has(socket.id)) return ack({ ok: false, message: 'You have already voted.' });
+    if (!Number.isInteger(option) || option < 0 || option > 3) return ack({ ok: false });
+    
+    poll.votes.set(socket.id, option);
+    poll.counts[option] += 1;
+    broadcast(poll);
+    ack({ ok: true });
+  }); // This closes the audience:vote event
+}); // This closes the io.on('connection') event
 
+// Start the server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 io.on('connection', (socket) => {
   socket.on('host:start-poll', (data, ack = () => {}) => {
     const room = String(data && data.room || '');
