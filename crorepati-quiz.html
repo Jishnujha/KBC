@@ -331,9 +331,63 @@ body[data-screen="intro"] #lifeBtn,body[data-screen="end"] #lifeBtn{visibility:h
 .lcard .cnt{font-family:var(--display);font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-soft);margin-top:2px}
 .lcard.used .cnt{color:#6c76b4}
 </style>
-</head>
-<body>
+
 <div class="wrap">
   <header class="hd">
     <div class="hl">
-      <button class="icon-btn"
+      <button class="icon-btn" id="exitBtn" aria-label="Leave the game" hidden>
+        <span class="c"><svg viewBox="0 0 24 24"><path d="M3 12l5-4.5v9z" fill="#fff"/><circle cx="16" cy="5.5" r="1.8"/><path d="M16 8.5v5M16 10.5l-3 2M16 10.5l2.5 1.5M16 13.5l-2.5 5M16 13.5l2.5 5"/></svg></span>
+      </button>
+    </div>
+
+    <div class="emblem" aria-hidden="true"></div>
+
+    <nav class="hr" aria-label="Game menu">
+      <button class="icon-btn" id="lifeBtn" disabled aria-label="Lifelines"><span class="c"><svg viewBox="0 0 24 24"><path d="M2 12h4l2.5-6 4 12 2.5-6H22"/></svg></span><span class="t">Lifelines</span></button>
+      <button class="icon-btn" data-open="mRules" aria-label="Rules"><span class="c"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M9 9h6M9 13h6"/></svg></span><span class="t">Rules</span></button>
+    </nav>
+  </header>
+
+  <main aria-live="polite">
+    <div id="intro" class="screen">
+      <h1>Win one crore</h1>
+      <p>Answer 7 questions and climb the prize ladder from ₹ 1,000 to ₹ 1,00,00,000. A wrong answer won't stop you, and you have two lifelines to help, each usable three times.</p>
+      <div class="row">
+        <button class="btn" id="startBtn">Start game</button>
+        <button class="btn ghost" data-open="mRules">Read the rules</button>
+      </div>
+    </div>
+
+    <div id="play" hidden>
+      <div class="cap">Question <b id="qNum">1</b> of 7 &nbsp;·&nbsp; Playing for <b id="pFor">₹ 1,000</b></div>
+      <div class="rows">
+        <div class="line qline"><div class="bar q"><div class="in" id="qText"></div></div></div>
+        <div id="opts" class="rows"></div>
+      </div>
+      <div class="act"><button class="btn" id="lockBtn" disabled>Lock answer</button></div>
+      <p class="hint">Press A, B, C or D to choose, then Enter to lock.</p>
+    </div>
+
+    <div id="end" class="screen" hidden>
+      <h1 id="endTitle"></h1>
+      <p id="endMsg"></p>
+      <div class="big" id="endAmt"></div>
+      <div class="row">
+        <button class="btn" id="againBtn">Play again</button>
+        <button class="btn ghost" id="endPrizeBtn">See results</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="foot"><button class="btn ghost small" id="soundBtn" aria-pressed="true">Sound: on</button></div>
+</div>
+
+<div class="overlay" id="mRules" hidden role="dialog" aria-modal="true" aria-labelledby="rulesH">
+  <div class="modal">
+    <h2 id="rulesH">Rules of the game</h2>
+    <ol class="rules">
+      <li>There are 7 questions with four options each. The prize grows with every question, from ₹ 1,000 up to ₹ 1 Crore.</li>
+      <li>Click an option, then press <b>Lock answer</b>. Once locked, it cannot be changed.</li>
+      <li>There is no timer, so take your time.</li>
+      <li>A wrong answer does not end the game. You see the correct answer and move on to the next question.</li>
+      <li>Your prize is the amount of the highest question you have answered correctly. The <b
