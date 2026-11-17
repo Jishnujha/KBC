@@ -11,10 +11,12 @@ const polls = new Map();
 // Serve only the files the game needs (not server.js / package.json).
 app.get('/audience.html', (_req, res) => res.sendFile(path.join(__dirname, 'audience.html')));
 app.get('/bg.avif', (_req, res) => res.type('image/avif').sendFile(path.join(__dirname, 'bg.avif')));
+app.get('/qr.png', (_req, res) => res.type('image/png').sendFile(path.join(__dirname, 'qr.png')));
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'crorepati-quiz.html')));
 
 function publicPoll(poll) {
   return {
+    id: poll.id,
     room: poll.room,
     question: poll.question,
     options: poll.options,
@@ -34,7 +36,8 @@ function closePoll(poll) {
   poll.open = false;
   clearInterval(poll.ticker);
   io.to(poll.room).emit('poll:closed', publicPoll(poll));
-  setTimeout(() => polls.delete(poll.room), 10 * 60 * 1000);
+  // Only delete this poll, never a newer poll that reuses the same room name.
+  setTimeout(() => { if (polls.get(poll.room) === poll) polls.delete(poll.room); }, 10 * 60 * 1000);
 }
 
 io.on('connection', (socket) => {
@@ -42,10 +45,15 @@ io.on('connection', (socket) => {
     const room = String(data && data.room || '');
     const options = data && data.options;
     const duration = Number(data && data.duration) || 30;
-    if (!/^kbc-[a-z0-9-]{6,40}$/i.test(room) || !Array.isArray(options) || options.length !== 4) {
+    if (!/^kbc-[a-z0-9-]{4,40}$/i.test(room) || !Array.isArray(options) || options.length !== 4) {
       return ack({ ok: false });
     }
+    // A new poll in this room replaces the old one: stop the old poll's timer so its
+    // votes are never sent again.
+    const old = polls.get(room);
+    if (old) { old.open = false; clearInterval(old.ticker); }
     const poll = {
+      id: String(data.id || Date.now()).slice(0, 40),
       room,
       question: String(data.question || '').slice(0, 300),
       options: options.map((option) => String(option).slice(0, 160)),
@@ -59,7 +67,7 @@ io.on('connection', (socket) => {
       if (Date.now() >= poll.endsAt) closePoll(poll);
     }, 1000);
     broadcast(poll);
-    ack({ ok: true });
+    ack({ ok: true, id: poll.id });
   });
 
   socket.on('audience:join', (room, ack = () => {}) => {
