@@ -561,6 +561,40 @@ const lockBtn    = $('lockBtn');
 const quitBtn    = $('quitBtn');
 const opts       = [0,1,2,3].map(i => $('opt'+i));
 
+/* ── Sounds ──
+   One shared audio player. Files are served by the server at /sounds/<name>:
+   intro, newquestion, rightanswer, wronganswer, 7crore. A new sound always stops the old one. */
+const player = new Audio();
+player.preload = 'auto';
+let playId = 0, flowTimer = null;
+function cancelSound() {
+  playId++; clearTimeout(flowTimer);
+  player.onended = null; player.onerror = null;
+  try { player.pause(); } catch (e) {}
+}
+// onEnd (optional) runs when the sound has finished playing. If the file is missing or
+// cannot play, onEnd still runs after fallbackMs so the game never gets stuck.
+function playSound(name, onEnd, fallbackMs) {
+  cancelSound();
+  const my = playId;
+  let called = false;
+  const done = () => {
+    if (called || my !== playId) return;
+    called = true; clearTimeout(flowTimer);
+    player.onended = null; player.onerror = null;
+    if (onEnd) onEnd();
+  };
+  const fallback = () => { if (onEnd && my === playId) { clearTimeout(flowTimer); flowTimer = setTimeout(done, fallbackMs || 1500); } };
+  if (onEnd) {
+    player.onended = done;
+    player.onerror = fallback;
+    flowTimer = setTimeout(done, 60000);   // safety net, longer than any sound
+  }
+  player.src = '/sounds/' + name;
+  const p = player.play();
+  if (p && p.catch) p.catch(fallback);
+}
+
 /* ── Screen helper ── */
 function showScreen(name) {
   document.body.dataset.screen = name;
@@ -584,6 +618,7 @@ function renderQuestion() {
   });
   picked = null;
   lockBtn.disabled = true;
+  playSound('newquestion');
 }
 
 /* ── Option picking ── */
@@ -604,33 +639,21 @@ lockBtn.addEventListener('click', () => {
   lockBtn.disabled = true;
   opts.forEach(b => b.disabled = true);
 
+  // The next question (or the results page) comes after the answer sound has finished.
+  const next = () => {
+    qIndex++;
+    if (qIndex >= QUESTIONS.length) endGame(true);
+    else renderQuestion();
+  };
+
+  opts[picked].classList.remove('picked');
   if (picked === q.ans) {
-    // Correct
-    opts[picked].classList.remove('picked');
     opts[picked].classList.add('correct');
-    setTimeout(() => {
-      qIndex++;
-      if (qIndex >= QUESTIONS.length) {
-        endGame(true);
-      } else {
-        renderQuestion();
-      }
-    }, 1800);
+    playSound('rightanswer', next, 1800);
   } else {
-    // Wrong — show correct answer then move on
-    opts[picked].classList.remove('picked');
     opts[picked].classList.add('wrong');
-    setTimeout(() => {
-      opts[q.ans].classList.add('correct');
-    }, 600);
-    setTimeout(() => {
-      qIndex++;
-      if (qIndex >= QUESTIONS.length) {
-        endGame(true);
-      } else {
-        renderQuestion();
-      }
-    }, 1800);
+    setTimeout(() => { opts[q.ans].classList.add('correct'); }, 600);
+    playSound('wronganswer', next, 1800);
   }
 });
 
@@ -638,6 +661,7 @@ lockBtn.addEventListener('click', () => {
 function endGame(won) {
   gameOver = true;
   showScreen('end');
+  playSound('7crore');
   if (won) {
     $('endTitle').textContent = '🎉 You\'re a Crorepati!';
     $('endAmt').textContent   = fmt(PRIZES[14]);
@@ -672,8 +696,20 @@ function startGame() {
   showScreen('play');
   renderQuestion();
 }
-$('startBtn').addEventListener('click', startGame);
-$('restartBtn').addEventListener('click', startGame);
+let introPlaying = false;
+$('startBtn').addEventListener('click', () => {
+  if (introPlaying) return;
+  introPlaying = true;
+  const btn = $('startBtn');
+  btn.disabled = true; btn.textContent = 'Get ready…';
+  // The first question appears only after the intro audio has finished.
+  playSound('intro', () => {
+    introPlaying = false;
+    btn.disabled = false; btn.textContent = 'Start Game';
+    startGame();
+  }, 500);
+});
+$('restartBtn').addEventListener('click', startGame);   // Play Again skips the intro
 
 /* ── Rules ── */
 [$('rulesBtn'), $('rulesBtn2'), $('rulesClose')].forEach(btn => {
