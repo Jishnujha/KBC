@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KBC Audience Vote</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071137;color:#f6f7ff}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at top,#42229a,#071137 58%)}main{width:min(620px,100%);padding:28px;border:1px solid #aeb8ef;border-radius:22px;background:linear-gradient(#252b94,#090d4c);box-shadow:0 20px 60px #0008}h1{margin:0 0 10px;color:#ffda78;text-align:center;font-size:24px;letter-spacing:.06em;text-transform:uppercase}#status{text-align:center;color:#d6dcff;min-height:24px}.question{font-size:clamp(21px,5vw,30px);font-weight:700;text-align:center;margin:24px 0}.options{display:grid;gap:12px}.option{padding:18px;border:2px solid #d9dfff;border-radius:12px;background:linear-gradient(#353bb4,#10145e);color:white;font:inherit;font-size:18px;text-align:left;cursor:pointer}.option:disabled{opacity:.58;cursor:default}.option:not(:disabled):active{transform:scale(.99)}.letter{color:#ffd05d;font-weight:800;margin-right:9px}.option.chosen{border-color:#ffd05d;background:linear-gradient(#e0911f,#8a4a05)}
+</style><main><h1>Audience Poll</h1><p id="status">Connecting…</p><div class="question" id="question"></div><div class="options" id="options"></div></main>
+<script src="/socket.io/socket.io.js"></script><script>
+(function(){
+var room=new URLSearchParams(location.search).get('room'),socket=io(),poll=null,pollId=null,myVote=null,retry=null;
+var $=function(id){return document.getElementById(id)};
+function render(data){
+  if(data.id!==pollId){pollId=data.id;myVote=null;}
+  poll=data;
+  $("question").textContent=data.question;
+  if(!data.open)$("status").textContent="Voting is closed. Thanks for voting!";
+  else if(myVote===null)$("status").textContent="Choose one answer — "+data.timeLeft+" seconds left";
+  else $("status").textContent="Vote received ("+"ABCD"[myVote]+") — "+data.timeLeft+" seconds left";
+  var box=$("options");box.textContent="";
+  data.options.forEach(function(text,i){
+    var b=document.createElement("button");
+    b.className="option"+(myVote===i?" chosen":"");b.dataset.option=i;b.disabled=!data.open||myVote!==null;
+    var l=document.createElement("span");l.className="letter";l.textContent="ABCD"[i]+".";
+    b.appendChild(l);b.appendChild(document.createTextNode(text));box.appendChild(b);
+  });
+}
+function join(){
+  clearTimeout(retry);
+  socket.emit("audience:join",room,function(reply){
+    if(!reply||!reply.ok){$("status").textContent="Waiting for the host to start the poll…";retry=setTimeout(join,2000);return;}
+    render(reply.poll);
+  });
+}
+socket.on("connect",join);
+socket.on("poll:update",render);
+socket.on("poll:closed",render);
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-option]");if(!b||!poll||!poll.open||myVote!==null)return;
+  var option=+b.dataset.option;
+  socket.emit("audience:vote",{room:room,option:option},function(reply){
+    if(reply&&reply.ok){myVote=option;render(poll);}
+    else if(reply&&reply.message){$("status").textContent=reply.message;}
+  });
+});
+})();
+</script></html>
