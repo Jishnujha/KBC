@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -12,6 +13,17 @@ const polls = new Map();
 app.get('/audience.html', (_req, res) => res.sendFile(path.join(__dirname, 'audience.html')));
 app.get('/bg.avif', (_req, res) => res.type('image/avif').sendFile(path.join(__dirname, 'bg.avif')));
 app.get('/qr.png', (_req, res) => res.type('image/png').sendFile(path.join(__dirname, 'qr.png')));
+// Sound files: intro, newquestion, rightanswer, wronganswer, 7crore (any of .mp3 .mpeg .mpg .m4a .wav .ogg).
+const SOUNDS = ['intro', 'newquestion', 'rightanswer', 'wronganswer', '7crore'];
+app.get('/sounds/:name', (req, res) => {
+  const name = String(req.params.name).toLowerCase();
+  if (!SOUNDS.includes(name)) return res.sendStatus(404);
+  const file = fs.readdirSync(__dirname).find((f) =>
+    f.slice(0, f.lastIndexOf('.')).toLowerCase() === name && /\.(mp3|mpeg|mpg|mpga|m4a|wav|ogg)$/i.test(f));
+  if (!file) return res.sendStatus(404);
+  if (/\.(mp3|mpeg|mpg|mpga)$/i.test(file)) res.type('audio/mpeg');
+  res.sendFile(path.join(__dirname, file));
+});
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'crorepati-quiz.html')));
 
 function publicPoll(poll) {
